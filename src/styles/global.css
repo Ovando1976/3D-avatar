@@ -1,0 +1,29 @@
+:root {
+  font-family: 'Outfit', system-ui, sans-serif;
+  color: #fdf9ff;
+  background-color: #0f0d1b;
+  line-height: 1.6;
+  font-weight: 400;
+  --panel-bg: rgba(23, 20, 37, 0.85);
+  --border: rgba(255, 255, 255, 0.12);
+  --accent: #6c63ff;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  min-height: 100vh;
+  background: radial-gradient(circle at top, #26175a 0%, #0f0d1b 60%);
+}
+
+a {
+  color: inherit;
+}
+
+button {
+  font-family: inherit;
+}
