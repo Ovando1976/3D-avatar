@@ -1,0 +1,55 @@
+.app-shell {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  padding: 2.5rem clamp(1.25rem, 5vw, 3.5rem);
+  gap: 2rem;
+}
+
+.app-header {
+  display: grid;
+  gap: 0.5rem;
+  text-align: center;
+}
+
+.app-header h1 {
+  font-size: clamp(2rem, 4vw, 3rem);
+  letter-spacing: -0.03em;
+}
+
+.app-header p {
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.app-main {
+  flex: 1;
+  display: grid;
+  gap: 1.5rem;
+  align-items: start;
+}
+
+.canvas-wrapper {
+  background: radial-gradient(circle at 30% 20%, rgba(108, 99, 255, 0.25), transparent 60%),
+    radial-gradient(circle at 70% 80%, rgba(247, 37, 133, 0.2), transparent 55%);
+  border-radius: 32px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  min-height: clamp(360px, 50vh, 560px);
+  overflow: hidden;
+  position: relative;
+}
+
+.canvas-wrapper canvas {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+.app-footer {
+  text-align: center;
+  color: rgba(255, 255, 255, 0.45);
+}
+
+@media (min-width: 960px) {
+  .app-main {
+    grid-template-columns: minmax(0, 1.1fr) minmax(320px, 0.9fr);
+  }
+}
