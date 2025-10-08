@@ -25,7 +25,11 @@ export class PluginManager {
   private readonly factories = new Map<string, PluginFactory>();
   private readonly sandboxApis = new Map<string, unknown>();
   private readonly activePlugins = new Map<string, ActivatedPlugin>();
+  
 
+      // prefix unused params with underscore
+  registerMessageHandler(_message: string) { /* ... */ }
+  registerPlugin(_name: string, _api: any, _callback: Function, _context?: any) { /* ... */ }
   registerManifest(manifest: PluginManifest, factory: PluginFactory): void {
     if (this.manifests.has(manifest.id)) {
       throw new Error(`Plugin with id ${manifest.id} already registered`);

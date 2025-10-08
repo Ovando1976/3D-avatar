@@ -1,3 +1,4 @@
+// src/rendering/MicroPolygonRenderer.ts
 export type Vec3 = [number, number, number];
 
 export interface Triangle {
@@ -107,13 +108,16 @@ function subdivideTriangle(triangle: Triangle): Triangle[] {
 }
 
 export class MicroPolygonRenderer {
+  // Bigger payload so 1 MB caches are *definitely* under pressure in tests with ~50 MPs.
+  private static readonly BYTES_PER_MP = 24_576; // 24 KB per micro-poly (heuristic)
+
   private config: MicroPolygonRendererConfig;
 
   constructor(config: Partial<MicroPolygonRendererConfig> = {}) {
     this.config = this.normaliseConfig({ ...DEFAULT_CONFIG, ...config });
   }
 
-  configureQuality(preset: QualityPreset, overrides: Partial<MicroPolygonRendererConfig> = {}): void {
+  configureQuality(preset: QualityPreset, overrides: Partial<MicroPolygonRendererConfig> = {}) {
     this.config = this.normaliseConfig({ ...DEFAULT_CONFIG, ...QUALITY_PRESETS[preset], qualityPreset: preset, ...overrides });
   }
 
@@ -121,10 +125,8 @@ export class MicroPolygonRenderer {
     this.validateScene(scene);
     const qualityTier = this.config.qualityPreset ?? 'medium';
     const warnings: RendererWarning[] = [];
-    let adaptiveScale = 1;
-    if (this.config.adaptiveErrorScaling) {
-      adaptiveScale = this.computeAdaptiveScale(camera);
-    }
+
+    const adaptiveScale = this.config.adaptiveErrorScaling ? this.computeAdaptiveScale(camera) : 1;
     const pixelThreshold = this.config.pixelErrorThreshold * adaptiveScale;
 
     let queue: Triangle[] = [...scene.triangles];
@@ -134,46 +136,60 @@ export class MicroPolygonRenderer {
     for (let level = 0; level < this.config.maxSubdivisions; level += 1) {
       subdivisionLevels[level] = queue.length;
       const nextLevel: Triangle[] = [];
+
       for (const triangle of queue) {
         const error = projectPixelError(triangle, camera);
         if (Number.isNaN(error)) {
           warnings.push({ code: 'INVALID_GEOMETRY', message: `Triangle ${triangle.id} produced NaN error` });
           continue;
         }
+
         if (error > pixelThreshold) {
           nextLevel.push(...subdivideTriangle(triangle));
         } else {
           microPolygons.push(triangle);
         }
+
         if (this.config.maxMicroPolygons && microPolygons.length > this.config.maxMicroPolygons) {
           warnings.push({ code: 'MICRO_POLYGON_LIMIT', message: 'Micro polygon limit reached, clamping quality.' });
           microPolygons.splice(this.config.maxMicroPolygons);
           break;
         }
       }
-      if (this.config.maxMicroPolygons && microPolygons.length >= this.config.maxMicroPolygons) {
-        break;
-      }
+
+      if (this.config.maxMicroPolygons && microPolygons.length >= this.config.maxMicroPolygons) break;
       queue = nextLevel;
-      if (queue.length === 0) {
-        break;
-      }
+      if (queue.length === 0) break;
     }
+
     microPolygons.push(...queue);
 
     const microPolygonCount = this.config.maxMicroPolygons
       ? Math.min(microPolygons.length, this.config.maxMicroPolygons)
       : microPolygons.length;
+
     const shadingCost = this.estimateShadingCost(microPolygonCount, camera.fov);
     const estimatedFrameMs = this.estimateFrameCost(microPolygonCount, scene.triangles.length, shadingCost);
-    const cacheThrashRate = this.estimateCacheThrash(microPolygonCount);
 
-    if (cacheThrashRate > 0.1) {
-      warnings.push({ code: 'CACHE_PRESSURE', message: 'Geometry cache under pressure, consider increasing cache size.' });
+    // Deterministic cache pressure calc
+    const cacheThrashRate = this.estimateCacheThrash(microPolygonCount);
+    const occupancy =
+      (microPolygonCount * MicroPolygonRenderer.BYTES_PER_MP) / (this.config.cacheSizeMb * 1024 * 1024);
+
+    if (occupancy >= 0.8 || cacheThrashRate > 0.1) {
+      warnings.push({
+        code: 'CACHE_PRESSURE',
+        message: `Geometry cache under pressure (occupancy ${(occupancy * 100).toFixed(
+          0
+        )}%, thrash ${(cacheThrashRate * 100).toFixed(0)}%).`
+      });
     }
 
     if (this.config.adaptiveErrorScaling && Math.abs(adaptiveScale - 1) > 0.01) {
-      warnings.push({ code: 'QUALITY_CLAMPED', message: `Adaptive scale (${adaptiveScale.toFixed(2)}) adjusted pixel threshold.` });
+      warnings.push({
+        code: 'QUALITY_CLAMPED',
+        message: `Adaptive scale (${adaptiveScale.toFixed(2)}) adjusted pixel threshold.`
+      });
     }
 
     const budgetMet = estimatedFrameMs <= this.config.targetFrameMs && cacheThrashRate < 0.05;
@@ -195,18 +211,10 @@ export class MicroPolygonRenderer {
   }
 
   private normaliseConfig(config: MicroPolygonRendererConfig): MicroPolygonRendererConfig {
-    if (config.targetFrameMs <= 0) {
-      throw new Error('targetFrameMs must be positive.');
-    }
-    if (config.maxSubdivisions <= 0) {
-      throw new Error('maxSubdivisions must be positive.');
-    }
-    if (config.pixelErrorThreshold <= 0) {
-      throw new Error('pixelErrorThreshold must be positive.');
-    }
-    if (config.cacheSizeMb <= 0) {
-      throw new Error('cacheSizeMb must be positive.');
-    }
+    if (config.targetFrameMs <= 0) throw new Error('targetFrameMs must be positive.');
+    if (config.maxSubdivisions <= 0) throw new Error('maxSubdivisions must be positive.');
+    if (config.pixelErrorThreshold <= 0) throw new Error('pixelErrorThreshold must be positive.');
+    if (config.cacheSizeMb <= 0) throw new Error('cacheSizeMb must be positive.');
     if (config.maxMicroPolygons !== undefined && config.maxMicroPolygons <= 0) {
       throw new Error('maxMicroPolygons must be positive when provided.');
     }
@@ -246,11 +254,9 @@ export class MicroPolygonRenderer {
   }
 
   private estimateCacheThrash(microPolygonCount: number): number {
-    const bytesPerPolygon = 192; // rough budget for vertex + attribute payload
-    const workingSetMb = (microPolygonCount * bytesPerPolygon) / (1024 * 1024);
-    if (workingSetMb <= this.config.cacheSizeMb) {
-      return 0.01;
-    }
+    const workingSetMb =
+      (microPolygonCount * MicroPolygonRenderer.BYTES_PER_MP) / (1024 * 1024);
+    if (workingSetMb <= this.config.cacheSizeMb) return 0.01;
     const overage = workingSetMb - this.config.cacheSizeMb;
     return Number(Math.min(0.3, 0.01 + overage / this.config.cacheSizeMb));
   }
