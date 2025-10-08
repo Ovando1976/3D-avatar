@@ -1,0 +1,15 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "types": ["vite/client"],
+    "outDir": "dist",
+    "rootDir": "src",
+    "composite": true
+  },
+  "include": ["src"],
+  "references": [
+    { "path": "../../packages/design-system" },
+    { "path": "../../packages/avatar-engine" },
+    { "path": "../../packages/ai-clients" }
+  ]
+}
