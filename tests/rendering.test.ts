@@ -1,10 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import {
-  MicroPolygonRenderer,
-  QualityPreset,
-  RendererWarning,
-  Scene
-} from '../src/engine/rendering/MicroPolygonRenderer.js';
+import type { QualityPreset, RendererWarning, Scene } from "../src/engine/rendering/MicroPolygonRenderer.js";
+import { MicroPolygonRenderer } from "../src/engine/rendering/MicroPolygonRenderer.js";
+
 
 const makeScene = (triangleCount: number): Scene => ({
   id: 'testScene',
@@ -28,7 +25,7 @@ describe('MicroPolygonRenderer', () => {
     expect(stats.warnings.every((warning: RendererWarning) => warning.code !== 'INVALID_GEOMETRY')).toBe(true);
   });
 
-  it.each<QualityPreset>([['low'], ['medium'], ['high'], ['cinematic']])(
+  it.each<QualityPreset>(['low', 'medium', 'high', 'cinematic'])(
     'honors quality preset %s and produces adaptive diagnostics',
     (preset) => {
       const renderer = new MicroPolygonRenderer();
@@ -43,7 +40,7 @@ describe('MicroPolygonRenderer', () => {
   it('reports budget metrics and warnings when cache pressure occurs', () => {
     const renderer = new MicroPolygonRenderer({ cacheSizeMb: 1, maxMicroPolygons: 50 });
     const stats = renderer.render(makeScene(20), { position: [0, 0, 2], fov: 120 });
-    expect(stats.warnings.some((warning) => warning.code === 'CACHE_PRESSURE')).toBe(true);
+    expect(stats.warnings.some((warning: RendererWarning) => warning.code === 'CACHE_PRESSURE')).toBe(true);
     expect(typeof stats.shadingCost).toBe('number');
   });
 });

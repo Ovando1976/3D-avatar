@@ -4,21 +4,56 @@
   "private": true,
   "description": "Prototype modules for the 3D Avatar Engine roadmap",
   "type": "module",
+  "main": "dist/index.js",
+  "module": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": ["dist"],
   "scripts": {
     "build": "tsc -p tsconfig.json",
+    "build:watch": "tsc -w -p tsconfig.json",
+    "clean": "rm -rf dist .turbo .vite .vitest coverage",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "eslint .",
-    "test": "vitest run"
+    "lint:fix": "eslint . --fix",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "dev": "vitest --watch",
+    "play": "pnpm build && node --enable-source-maps dist/playground.js",
+    "play:fast": "node --enable-source-maps dist/playground.js",
+    "watch:build": "tsc -w -p tsconfig.json",
+    "test:ci": "vitest run --reporter=dot",
+    "prepush:ci": "pnpm typecheck && pnpm test:ci",
+    "postinstall": "simple-git-hooks",
+    "prepublishOnly": "pnpm run clean && pnpm run build && pnpm run test && pnpm run typecheck && pnpm run lint"
   },
-  "dependencies": {
-    "eventemitter3": "^5.0.1"
-  },
+  "dependencies": {},
   "devDependencies": {
-    "@types/node": "^20.11.0",
-    "@typescript-eslint/eslint-plugin": "^6.21.0",
-    "@typescript-eslint/parser": "^6.21.0",
-    "eslint": "^8.56.0",
-    "eslint-config-prettier": "^9.1.0",
-    "typescript": "^5.4.2",
-    "vitest": "^1.4.0"
+    "@eslint/js": "^9.13.0",
+    "@types/node": "^20.12.12",
+    "@typescript-eslint/eslint-plugin": "^8.14.0",
+    "@typescript-eslint/parser": "^8.14.0",
+    "eslint": "^9.13.0",
+    "eslint-config-prettier": "^10.0.1",
+    "lint-staged": "^16.2.3",
+    "simple-git-hooks": "^2.13.1",
+    "typescript": "^5.6.3",
+    "vitest": "^1.6.1"
+  },
+  "simple-git-hooks": {
+    "pre-commit": "pnpm lint-staged",
+    "pre-push": "pnpm run prepush:ci"
+  },
+  "lint-staged": {
+    "**/*.{ts,tsx,js,mjs,cjs}": "eslint --cache --fix"
+  },
+  "engines": {
+    "node": ">=18.17"
   }
 }

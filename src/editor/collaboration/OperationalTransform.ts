@@ -18,9 +18,8 @@ export interface TransformResult {
 export type ConflictResolution = 'local' | 'remote';
 
 export interface TransformContext {
-  apply(state: unknown, operation: TransformOperation): unknown;
+  apply(_state: unknown, _operation: TransformOperation, _resolution?: ConflictResolution): unknown;
 }
-
 function parseSegments(path: string): (string | number)[] {
   return path
     .split('.')
