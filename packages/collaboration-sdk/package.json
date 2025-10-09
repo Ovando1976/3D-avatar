@@ -7,13 +7,15 @@
   "types": "dist/index.d.ts",
   "scripts": {
     "build": "tsc -b",
-    "lint": "eslint \"src/**/*.ts\""
+    "lint": "eslint \"src/**/*.ts\"",
+    "test": "vitest"
   },
   "dependencies": {
     "automerge": "2.1.7"
   },
   "devDependencies": {
     "eslint": "8.57.0",
-    "typescript": "5.4.5"
+    "typescript": "5.4.5",
+    "vitest": "1.6.0"
   }
 }

@@ -3,13 +3,39 @@ import {
   GraphQLObjectType,
   GraphQLString,
   GraphQLList,
-  GraphQLNonNull
+  GraphQLNonNull,
+  GraphQLInt
 } from 'graphql';
-import { CollaborationSessionService } from '@3d-avatar/collaboration-sdk';
-import { PoseGenerationClient } from '@3d-avatar/ai-clients';
+import { type SessionDetail } from '@3d-avatar/collaboration-sdk';
+import { poseClient, sessionService } from './services.js';
 
-const sessionService = new CollaborationSessionService();
-const poseClient = new PoseGenerationClient();
+const poseType = new GraphQLObjectType({
+  name: 'Pose',
+  fields: {
+    id: { type: new GraphQLNonNull(GraphQLString) },
+    createdAt: {
+      type: new GraphQLNonNull(GraphQLString),
+      resolve: pose => new Date(pose.createdAt).toISOString()
+    },
+    keyframeCount: { type: new GraphQLNonNull(GraphQLInt) },
+    source: { type: GraphQLString },
+    prompt: { type: GraphQLString },
+    previewUrl: { type: GraphQLString }
+  }
+});
+
+const sessionSummaryType = new GraphQLObjectType({
+  name: 'SessionSummary',
+  fields: {
+    id: { type: new GraphQLNonNull(GraphQLString) },
+    participants: { type: new GraphQLList(GraphQLString) },
+    lastUpdated: {
+      type: new GraphQLNonNull(GraphQLString),
+      resolve: session => new Date(session.lastUpdated).toISOString()
+    },
+    poseCount: { type: new GraphQLNonNull(GraphQLInt) }
+  }
+});
 
 const sessionType = new GraphQLObjectType({
   name: 'Session',
@@ -19,9 +45,18 @@ const sessionType = new GraphQLObjectType({
     lastUpdated: {
       type: new GraphQLNonNull(GraphQLString),
       resolve: session => new Date(session.lastUpdated).toISOString()
-    }
+    },
+    poseCount: { type: new GraphQLNonNull(GraphQLInt) },
+    poses: { type: new GraphQLList(poseType) }
   }
 });
+
+function formatSession(session: SessionDetail): SessionDetail {
+  return {
+    ...session,
+    poses: session.poses.slice(0, 50)
+  };
+}
 
 export function buildSchema(): GraphQLSchema {
   const queryType = new GraphQLObjectType({
@@ -32,8 +67,18 @@ export function buildSchema(): GraphQLSchema {
         resolve: () => 'ok'
       },
       activeSessions: {
-        type: new GraphQLList(sessionType),
+        type: new GraphQLList(sessionSummaryType),
         resolve: () => sessionService.listSessionSummaries()
+      },
+      session: {
+        type: sessionType,
+        args: {
+          id: { type: new GraphQLNonNull(GraphQLString) }
+        },
+        resolve: (_, args): SessionDetail | null => {
+          const session = sessionService.getSession(args.id);
+          return session ? formatSession(session) : null;
+        }
       }
     }
   });
@@ -42,17 +87,40 @@ export function buildSchema(): GraphQLSchema {
     name: 'Mutation',
     fields: {
       suggestPose: {
-        type: GraphQLString,
+        type: poseType,
         args: {
-          prompt: { type: GraphQLString }
+          prompt: { type: new GraphQLNonNull(GraphQLString) },
+          sessionId: { type: GraphQLString }
         },
         resolve: async (_, args) => {
-          if (!args.prompt) {
-            throw new Error('prompt is required');
+          const pose = await poseClient.suggestPose(args.prompt);
+          const createdAt = Date.now();
+
+          if (args.sessionId) {
+            const session = sessionService.getSession(args.sessionId);
+
+            if (!session) {
+              throw new Error(`Session ${args.sessionId} not found`);
+            }
+
+            const updated = sessionService.recordPose(args.sessionId, {
+              id: pose.id,
+              keyframeCount: pose.data.keyframes.length,
+              prompt: args.prompt,
+              source: 'ai',
+              createdAt
+            });
+
+            return updated.poses[0];
           }
 
-          const pose = await poseClient.suggestPose(args.prompt);
-          return pose.id;
+          return {
+            id: pose.id,
+            createdAt,
+            keyframeCount: pose.data.keyframes.length,
+            source: 'ai',
+            prompt: args.prompt
+          };
         }
       },
       createSession: {
@@ -60,12 +128,33 @@ export function buildSchema(): GraphQLSchema {
         args: {
           participants: { type: new GraphQLList(GraphQLString) }
         },
-        resolve: (_, args) => {
+        resolve: (_, args): SessionDetail => {
           if (!args.participants || args.participants.length === 0) {
             throw new Error('participants are required');
           }
 
-          return sessionService.createSession(args.participants);
+          const session = sessionService.createSession(args.participants);
+          return formatSession(session);
+        }
+      },
+      recordPose: {
+        type: sessionType,
+        args: {
+          sessionId: { type: new GraphQLNonNull(GraphQLString) },
+          poseId: { type: new GraphQLNonNull(GraphQLString) },
+          keyframeCount: { type: new GraphQLNonNull(GraphQLInt) },
+          source: { type: GraphQLString },
+          prompt: { type: GraphQLString }
+        },
+        resolve: (_, args): SessionDetail => {
+          const session = sessionService.recordPose(args.sessionId, {
+            id: args.poseId,
+            keyframeCount: args.keyframeCount,
+            source: (args.source ?? 'manual') as 'ai' | 'manual' | 'imported',
+            prompt: args.prompt
+          });
+
+          return formatSession(session);
         }
       }
     }

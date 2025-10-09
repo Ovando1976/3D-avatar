@@ -88,7 +88,42 @@ body {
   gap: 0.75rem;
 }
 
-.session-list li,
+.session-list li {
+  margin: 0;
+  padding: 0;
+}
+
+.session-item {
+  width: 100%;
+  background: rgba(15, 23, 42, 0.7);
+  border-radius: 0.85rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  font-size: 0.95rem;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
+}
+
+.session-item:hover {
+  border-color: rgba(56, 189, 248, 0.4);
+}
+
+.session-item:focus-visible {
+  outline: 2px solid rgba(56, 189, 248, 0.8);
+  outline-offset: 2px;
+}
+
+.session-item--active {
+  border-color: rgba(56, 189, 248, 0.55);
+  background: rgba(15, 23, 42, 0.85);
+  box-shadow: 0 12px 40px rgba(56, 189, 248, 0.15);
+}
+
 .history-list li {
   background: rgba(15, 23, 42, 0.7);
   border-radius: 0.85rem;
@@ -119,6 +154,17 @@ body {
 .session-timestamp {
   color: rgba(148, 163, 184, 0.65);
   font-size: 0.85rem;
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.session-poses {
+  background: rgba(56, 189, 248, 0.1);
+  border-radius: 999px;
+  padding: 0.1rem 0.6rem;
+  color: rgba(125, 211, 252, 0.85);
+  font-size: 0.75rem;
 }
 
 .history-id {
@@ -127,6 +173,22 @@ body {
 
 .history-meta {
   color: rgba(148, 163, 184, 0.75);
+}
+
+.history-time {
+  color: rgba(148, 163, 184, 0.6);
+  font-size: 0.8rem;
+}
+
+.session-summary {
+  display: flex;
+  gap: 1rem;
+  font-size: 0.9rem;
+  color: rgba(148, 163, 184, 0.85);
+  background: rgba(15, 23, 42, 0.65);
+  padding: 0.6rem 1rem;
+  border-radius: 0.75rem;
+  border: 1px solid rgba(148, 163, 184, 0.15);
 }
 
 .muted {
@@ -164,7 +226,7 @@ body {
     align-items: flex-start;
   }
 
-  .session-list li,
+  .session-item,
   .history-list li {
     flex-direction: column;
     align-items: flex-start;

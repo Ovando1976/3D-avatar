@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AvatarViewport } from '@3d-avatar/avatar-engine';
 import type { PoseSuggestion } from '@3d-avatar/ai-clients';
-import type { SessionState } from '@3d-avatar/collaboration-sdk';
+import type { PoseSnapshot, SessionDetail, SessionSummary } from '@3d-avatar/collaboration-sdk';
 import { Button, Panel, Stack, TextField } from '@3d-avatar/design-system';
 import { usePoseSuggestion } from './hooks/usePoseSuggestion';
 import './app.css';
@@ -9,29 +9,43 @@ import './app.css';
 const DEFAULT_PROMPT = 'dynamic hero landing pose';
 const MAX_HISTORY = 5;
 
+function toSnapshot(pose: PoseSuggestion, prompt: string): PoseSnapshot {
+  return {
+    id: pose.id,
+    keyframeCount: pose.data.keyframes.length,
+    createdAt: Date.now(),
+    source: 'ai',
+    prompt
+  };
+}
+
+function limitHistory(history: PoseSnapshot[]): PoseSnapshot[] {
+  return history.slice(0, MAX_HISTORY);
+}
+
 export function App(): JSX.Element {
   const [prompt, setPrompt] = useState(DEFAULT_PROMPT);
   const { pose, loading, error, requestPose } = usePoseSuggestion();
-  const [sessions, setSessions] = useState<SessionState[]>([]);
+  const [sessions, setSessions] = useState<SessionSummary[]>([]);
   const [sessionError, setSessionError] = useState<string | null>(null);
-  const [history, setHistory] = useState<PoseSuggestion[]>([]);
+  const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
+  const [sessionDetail, setSessionDetail] = useState<SessionDetail | null>(null);
+  const [history, setHistory] = useState<PoseSnapshot[]>([]);
 
-  useEffect(() => {
-    requestPose(DEFAULT_PROMPT).catch(() => {
-      /* handled inside hook */
+  const loadSessionDetail = useCallback(async (sessionId: string) => {
+    const baseUrl = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:4000';
+    const response = await fetch(`${baseUrl}/sessions/${sessionId}`, {
+      headers: { Accept: 'application/json' }
     });
-  }, [requestPose]);
 
-  useEffect(() => {
-    if (!pose) {
-      return;
+    if (!response.ok) {
+      throw new Error(`Unable to load session (${response.status})`);
     }
 
-    setHistory(previous => {
-      const next = [pose, ...previous.filter(item => item.id !== pose.id)];
-      return next.slice(0, MAX_HISTORY);
-    });
-  }, [pose]);
+    const data: { session: SessionDetail } = await response.json();
+    setSessionDetail(data.session);
+    setHistory(limitHistory(data.session.poses));
+  }, []);
 
   const refreshSessions = useCallback(async () => {
     try {
@@ -42,23 +56,68 @@ export function App(): JSX.Element {
         throw new Error(`Unable to load sessions (${response.status})`);
       }
 
-      const data: { sessions: SessionState[] } = await response.json();
+      const data: { sessions: SessionSummary[] } = await response.json();
       setSessions(data.sessions);
       setSessionError(null);
+
+      if (data.sessions.length === 0) {
+        setSelectedSessionId(null);
+        setSessionDetail(null);
+        setHistory([]);
+        return;
+      }
+
+      const targetId = data.sessions.some(session => session.id === selectedSessionId)
+        ? selectedSessionId!
+        : data.sessions[0]?.id;
+
+      if (targetId) {
+        setSelectedSessionId(targetId);
+        await loadSessionDetail(targetId);
+      }
     } catch (fetchError) {
       console.warn('[studio] Unable to fetch sessions, falling back to offline mode', fetchError);
+      const limitedHistory = limitHistory(history);
+      const offlineSession: SessionDetail = {
+        id: 'local-preview',
+        participants: ['you'],
+        lastUpdated: Date.now(),
+        poseCount: limitedHistory.length,
+        poses: limitedHistory
+      };
       setSessions([
-        { id: 'local-preview', participants: ['you'], lastUpdated: Date.now() }
+        {
+          id: offlineSession.id,
+          participants: offlineSession.participants,
+          lastUpdated: offlineSession.lastUpdated,
+          poseCount: offlineSession.poseCount
+        }
       ]);
+      setSelectedSessionId(offlineSession.id);
+      setHistory(limitedHistory);
+      setSessionDetail(offlineSession);
       setSessionError('Connected in offline preview mode');
     }
-  }, []);
+  }, [history, loadSessionDetail, selectedSessionId]);
 
   useEffect(() => {
     refreshSessions().catch(() => {
-      /* error handled inside */
+      /* error handled above */
     });
   }, [refreshSessions]);
+
+  useEffect(() => {
+    if (!pose || !sessionDetail) {
+      return;
+    }
+
+    const updatedAt = new Date().getTime();
+    setSessionDetail(current =>
+      current
+        ? { ...current, lastUpdated: updatedAt }
+        : null
+    );
+  }, [pose, sessionDetail]);
 
   const handleSubmit = useCallback(
     async (event: React.FormEvent<HTMLFormElement>) => {
@@ -67,9 +126,59 @@ export function App(): JSX.Element {
         return;
       }
 
-      await requestPose(prompt.trim());
+      const result = await requestPose(prompt.trim(), { sessionId: selectedSessionId ?? undefined });
+
+      if (result?.session) {
+        setSessionDetail(result.session);
+        setHistory(limitHistory(result.session.poses));
+        setSessionError(null);
+        setSessions(current =>
+          current.map(summary =>
+            summary.id === result.session.id
+              ? {
+                  ...summary,
+                  poseCount: result.session.poseCount,
+                  lastUpdated: result.session.lastUpdated
+                }
+              : summary
+          )
+        );
+      } else if (result?.pose) {
+        const snapshot = toSnapshot(result.pose, prompt);
+        setHistory(previous => limitHistory([snapshot, ...previous]));
+        setSessionDetail(current => {
+          const base =
+            current ?? {
+              id: 'local-preview',
+              participants: ['you'],
+              lastUpdated: Date.now(),
+              poseCount: 0,
+              poses: []
+            };
+          const updatedPoses = limitHistory([snapshot, ...base.poses]);
+          return {
+            ...base,
+            poses: updatedPoses,
+            poseCount: updatedPoses.length,
+            lastUpdated: Date.now()
+          };
+        });
+        if (selectedSessionId) {
+          setSessions(current =>
+            current.map(summary =>
+              summary.id === selectedSessionId
+                ? {
+                    ...summary,
+                    poseCount: Math.min(summary.poseCount + 1, MAX_HISTORY),
+                    lastUpdated: Date.now()
+                  }
+                : summary
+            )
+          );
+        }
+      }
     },
-    [prompt, requestPose]
+    [prompt, requestPose, selectedSessionId]
   );
 
   const activePoseDetails = useMemo(() => {
@@ -102,17 +211,34 @@ export function App(): JSX.Element {
         >
           {sessions.length > 0 ? (
             <ul className="session-list">
-              {sessions.map(session => (
-                <li key={session.id}>
-                  <div className="session-meta">
-                    <span className="session-id">{session.id}</span>
-                    <span className="session-participants">{session.participants.join(', ')}</span>
-                  </div>
-                  <span className="session-timestamp">
-                    {new Date(session.lastUpdated).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                  </span>
-                </li>
-              ))}
+              {sessions.map(session => {
+                const isActive = session.id === selectedSessionId;
+                return (
+                  <li key={session.id}>
+                    <button
+                      type="button"
+                      className={`session-item${isActive ? ' session-item--active' : ''}`}
+                      onClick={() => {
+                        setSelectedSessionId(session.id);
+                        if (!sessionError) {
+                          void loadSessionDetail(session.id).catch(() => {
+                            /* handled via sessionError */
+                          });
+                        }
+                      }}
+                    >
+                      <div className="session-meta">
+                        <span className="session-id">{session.id}</span>
+                        <span className="session-participants">{session.participants.join(', ')}</span>
+                      </div>
+                      <div className="session-timestamp">
+                        <span>{new Date(session.lastUpdated).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                        <span className="session-poses">{session.poseCount} poses</span>
+                      </div>
+                    </button>
+                  </li>
+                );
+              })}
             </ul>
           ) : (
             <p>No live sessions yet. Start one from the automation worker or invite a collaborator.</p>
@@ -127,7 +253,8 @@ export function App(): JSX.Element {
               {history.map(item => (
                 <li key={item.id}>
                   <span className="history-id">{item.id}</span>
-                  <span className="history-meta">{item.data.keyframes.length} keyframes</span>
+                  <span className="history-meta">{item.keyframeCount} keyframes</span>
+                  <span className="history-time">{new Date(item.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                 </li>
               ))}
             </ul>
@@ -139,7 +266,10 @@ export function App(): JSX.Element {
         <header className="workspace__header">
           <div>
             <h1>3D Avatar Studio</h1>
-            <p>Design expressive avatars with AI-assisted posing, real-time collaboration, and production-ready pipelines.</p>
+            <p>
+              Design expressive avatars with AI-assisted posing, real-time collaboration, and production-ready
+              pipelines.
+            </p>
           </div>
           <Button
             variant="secondary"
@@ -154,6 +284,12 @@ export function App(): JSX.Element {
             <div className="pose-meta">
               <span>Pose ID: {activePoseDetails.identifier}</span>
               <span>{activePoseDetails.keyframes} keyframes applied</span>
+            </div>
+          )}
+          {sessionDetail && (
+            <div className="session-summary">
+              <span>Participants: {sessionDetail.participants.join(', ')}</span>
+              <span>Stored poses: {sessionDetail.poseCount}</span>
             </div>
           )}
         </section>

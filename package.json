@@ -8,11 +8,11 @@
     "tools/*"
   ],
   "scripts": {
-    "build": "npm run build --workspaces",
+    "build": "npm --workspaces --if-present run build",
     "dev": "node ./tools/scripts/dev.mjs",
-    "lint": "npm run lint --workspaces",
-    "test": "npm run test --workspaces",
-    "dev:workspaces": "npm run dev --workspaces"
+    "lint": "npm --workspaces --if-present run lint",
+    "test": "npm --workspaces --if-present run test",
+    "dev:workspaces": "npm --workspaces run dev"
   },
   "devDependencies": {
     "typescript": "5.4.5"
