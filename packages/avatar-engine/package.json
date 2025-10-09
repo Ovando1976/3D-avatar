@@ -1,0 +1,20 @@
+{
+  "name": "@3d-avatar/avatar-engine",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -b",
+    "lint": "eslint \"src/**/*.ts\""
+  },
+  "dependencies": {
+    "three": "0.165.0"
+  },
+  "devDependencies": {
+    "@types/three": "0.165.0",
+    "eslint": "8.57.0",
+    "typescript": "5.4.5"
+  }
+}
