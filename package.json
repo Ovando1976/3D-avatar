@@ -1,0 +1,24 @@
+{
+  "name": "3d-avatar-monorepo",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": [
+    "apps/*",
+    "packages/*",
+    "tools/*"
+  ],
+  "scripts": {
+    "build": "npm --workspaces --if-present run build",
+    "dev": "node ./tools/scripts/dev.mjs",
+    "lint": "npm --workspaces --if-present run lint",
+    "test": "npm --workspaces --if-present run test",
+    "dev:workspaces": "npm --workspaces run dev"
+  },
+  "devDependencies": {
+    "@eslint/js": "9.13.0",
+    "@typescript-eslint/eslint-plugin": "8.8.1",
+    "@typescript-eslint/parser": "8.8.1",
+    "eslint": "9.13.0",
+    "typescript": "5.4.5"
+  }
+}

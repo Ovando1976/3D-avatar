@@ -1,0 +1,19 @@
+{
+  "name": "@3d-avatar/collaboration-sdk",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -b",
+    "lint": "eslint \"src/**/*.ts\"",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@types/node": "20.12.12",
+    "eslint": "9.13.0",
+    "typescript": "5.4.5",
+    "vitest": "1.6.0"
+  }
+}

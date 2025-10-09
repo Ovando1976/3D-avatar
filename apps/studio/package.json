@@ -1,0 +1,29 @@
+{
+  "name": "@3d-avatar/studio",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview",
+    "lint": "eslint \"src/**/*.{ts,tsx}\"",
+    "test": "vitest run --config vitest.config.ts"
+  },
+  "dependencies": {
+    "@3d-avatar/ai-clients": "file:../../packages/ai-clients",
+    "@3d-avatar/avatar-engine": "file:../../packages/avatar-engine",
+    "@3d-avatar/design-system": "file:../../packages/design-system",
+    "react": "18.3.1",
+    "react-dom": "18.3.1"
+  },
+  "devDependencies": {
+    "@types/react": "18.3.3",
+    "@types/react-dom": "18.3.0",
+    "@vitejs/plugin-react": "4.2.1",
+    "eslint": "9.13.0",
+    "typescript": "5.4.5",
+    "vite": "5.2.12",
+    "vitest": "1.6.0"
+  }
+}

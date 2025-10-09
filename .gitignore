@@ -1,0 +1,11 @@
+node_modules/
+dist/
+build/
+.vite/
+.env
+.DS_Store
+coverage/
+data/
+
+# TypeScript
+*.tsbuildinfo

@@ -1,0 +1,19 @@
+{
+  "name": "@3d-avatar/ai-clients",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -b",
+    "lint": "eslint \"src/**/*.ts\""
+  },
+  "dependencies": {
+    "openai": "4.57.1"
+  },
+  "devDependencies": {
+    "eslint": "9.13.0",
+    "typescript": "5.4.5"
+  }
+}
