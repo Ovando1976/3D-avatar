@@ -14,9 +14,9 @@ Initial scaffolding has been added to reflect the proposed monorepo layout and p
 
 ### Getting Started
 
-The monorepo is configured as an npm workspace. After installing dependencies with `npm install`, you can explore the live
-scaffolding:
+The monorepo is configured as an npm workspace. After installing dependencies with `npm install`, you can explore the live scaffolding:
 
+- `npm run dev` – Boots the studio, API gateway, and automation worker simultaneously for a full-stack local environment.
 - `npm run dev --workspace @3d-avatar/studio` – Launches the Vite-powered web studio that composes the design system and avatar engine preview.
 - `npm run dev --workspace @3d-avatar/api-gateway` – Starts the API gateway with REST and GraphQL endpoints backed by shared packages.
 - `npm run dev --workspace @3d-avatar/automation-worker` – Runs the queue-driven worker that simulates render and AI pose jobs.
